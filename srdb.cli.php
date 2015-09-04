@@ -31,15 +31,14 @@ $opts = array(
     'a:' => 'alter-collation:',
     'v::' => 'verbose::',
     'port:',
-    'ini',
     'help'
 );
 
 $required = array(
     'h:',
-    'n:',
     'u:',
-    'p:'
+    'p:',
+    'n:'
 );
 
 function strip_colons( $string ) {
@@ -87,9 +86,6 @@ ARGS
   --port
     Optional. Port on database server to connect to.
     The default is 3306. (MySQL default port).
-  --ini
-    Optional. Search for ~/.my.cnf or other common locations of
-    mysql connection configuration file.
   -s, --search
     String to search for or `preg_replace()` style
     regular expression.
@@ -132,15 +128,10 @@ ARGS
 // missing field flag, show all missing instead of 1 at a time
 $missing_arg = false;
 
-// Check if the ini arg is passed. In this case, we populate required fields with .my.cnf config
-if ( isset( $options[ 'ini' ] ) ) {
-    if ( $mycnf = parse_ini_file(getenv('HOME').'/.my.cnf',true) ) {
-        $options[ 'user' ] = $mycnf[ 'client' ][ 'user' ];
-        $options[ 'pass' ] = $mycnf[ 'client' ][ 'pass' ];
-    }
-    if ( $mycnf = parse_ini_file('/etc/mysql/my.cnf',true) ) {
-        $options[ 'port' ] = $mycnf[ 'client' ][ 'port' ];
-    }
+// Get ~/.my.cnf file for user and pass if not submitted
+if ( $mycnf = parse_ini_file(getenv('HOME').'/.my.cnf',true) ) {
+    if ( ! isset( $options[ 'user' ] ) ) $options[ 'user' ] = $mycnf[ 'client' ][ 'user' ];
+    if ( ! isset( $options[ 'pass' ] ) ) $options[ 'pass' ] = $mycnf[ 'client' ][ 'pass' ];
 }
 
 // check required args are passed
