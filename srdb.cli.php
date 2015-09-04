@@ -14,39 +14,40 @@ date_default_timezone_set( 'Europe/London' );
 require_once( realpath( dirname( __FILE__ ) ) . '/srdb.class.php' );
 
 $opts = array(
-	'h:' => 'host:',
-	'n:' => 'name:',
-	'u:' => 'user:',
-	'p:' => 'pass:',
-	'c:' => 'char:',
-	's:' => 'search:',
-	'r:' => 'replace:',
-	't:' => 'tables:',
-	'i:' => 'include-cols:',
-	'x:' => 'exclude-cols:',
-	'g' => 'regex',
-	'l:' => 'pagesize:',
-	'z' => 'dry-run',
-	'e:' => 'alter-engine:',
-	'a:' => 'alter-collation:',
-	'v::' => 'verbose::',
-	'port:',
-	'help'
+    'h:' => 'host:',
+    'n:' => 'name:',
+    'u:' => 'user:',
+    'p:' => 'pass:',
+    'c:' => 'char:',
+    's:' => 'search:',
+    'r:' => 'replace:',
+    't:' => 'tables:',
+    'i:' => 'include-cols:',
+    'x:' => 'exclude-cols:',
+    'g' => 'regex',
+    'l:' => 'pagesize:',
+    'z' => 'dry-run',
+    'e:' => 'alter-engine:',
+    'a:' => 'alter-collation:',
+    'v::' => 'verbose::',
+    'port:',
+    'ini',
+    'help'
 );
 
 $required = array(
-	'h:',
-	'n:',
-	'u:',
-	'p:'
+    'h:',
+    'n:',
+    'u:',
+    'p:'
 );
 
 function strip_colons( $string ) {
-	return str_replace( ':', '', $string );
+    return str_replace( ':', '', $string );
 }
 
 // store arg values
-$arg_count 	= $_SERVER[ 'argc' ];
+$arg_count  = $_SERVER[ 'argc' ];
 $args_array = $_SERVER[ 'argv' ];
 
 $short_opts = array_keys( $opts );
@@ -59,7 +60,7 @@ $long_opts_normal = array_map( 'strip_colons', $long_opts );
 $options = getopt( implode( '', $short_opts ), $long_opts );
 
 if ( isset( $options[ 'help' ] ) ) {
-	echo "
+    echo "
 #####################################################################
 
 interconnect/it Safe Search & Replace tool
@@ -86,6 +87,9 @@ ARGS
   --port
     Optional. Port on database server to connect to.
     The default is 3306. (MySQL default port).
+  --ini
+    Optional. Search for ~/.my.cnf or other common locations of
+    mysql connection configuration file.
   -s, --search
     String to search for or `preg_replace()` style
     regular expression.
@@ -122,104 +126,115 @@ ARGS
   --help
     Displays this help message ;)
 ";
-	exit;
+    exit;
 }
 
 // missing field flag, show all missing instead of 1 at a time
 $missing_arg = false;
 
+// Check if the ini arg is passed. In this case, we populate required fields with .my.cnf config
+if ( isset( $options[ 'ini' ] ) ) {
+    if ( $mycnf = parse_ini_file(getenv('HOME').'/.my.cnf',true) ) {
+        $options[ 'user' ] = $mycnf[ 'client' ][ 'user' ];
+        $options[ 'pass' ] = $mycnf[ 'client' ][ 'pass' ];
+    }
+    if ( $mycnf = parse_ini_file('/etc/mysql/my.cnf',true) ) {
+        $options[ 'port' ] = $mycnf[ 'client' ][ 'port' ];
+    }
+}
+
 // check required args are passed
 foreach( $required as $key ) {
-	$short_opt = strip_colons( $key );
-	$long_opt = strip_colons( $opts[ $key ] );
-	if ( ! isset( $options[ $short_opt ] ) && ! isset( $options[ $long_opt ] ) ) {
-		fwrite( STDERR, "Error: Missing argument, -{$short_opt} or --{$long_opt} is required.\n" );
-		$missing_arg = true;
-	}
+    $short_opt = strip_colons( $key );
+    $long_opt = strip_colons( $opts[ $key ] );
+    if ( ! isset( $options[ $short_opt ] ) && ! isset( $options[ $long_opt ] ) ) {
+        fwrite( STDERR, "Error: Missing argument, -{$short_opt} or --{$long_opt} is required.\n" );
+        $missing_arg = true;
+    }
 }
 
 // bail if requirements not met
 if ( $missing_arg ) {
-	fwrite( STDERR, "Please enter the missing arguments.\n" );
-	exit( 1 );
+    fwrite( STDERR, "Please enter the missing arguments.\n" );
+    exit( 1 );
 }
 
 // new args array
 $args = array(
-	'verbose' => true,
-	'dry_run' => false
+    'verbose' => true,
+    'dry_run' => false
 );
 
 // create $args array
 foreach( $options as $key => $value ) {
 
-	// transpose keys
-	if ( ( $is_short = array_search( $key, $short_opts_normal ) ) !== false )
-		$key = $long_opts_normal[ $is_short ];
+    // transpose keys
+    if ( ( $is_short = array_search( $key, $short_opts_normal ) ) !== false )
+        $key = $long_opts_normal[ $is_short ];
 
-	// true/false string mapping
-	if ( is_string( $value ) && in_array( $value, array( 'false', 'no', '0' ) ) )
-		$value = false;
-	if ( is_string( $value ) && in_array( $value, array( 'true', 'yes', '1' ) ) )
-		$value = true;
+    // true/false string mapping
+    if ( is_string( $value ) && in_array( $value, array( 'false', 'no', '0' ) ) )
+        $value = false;
+    if ( is_string( $value ) && in_array( $value, array( 'true', 'yes', '1' ) ) )
+        $value = true;
 
-	// boolean options as is, eg. a no value arg should be set true
-	if ( in_array( $key, $long_opts ) )
-		$value = true;
+    // boolean options as is, eg. a no value arg should be set true
+    if ( in_array( $key, $long_opts ) )
+        $value = true;
 
-	// change to underscores
-	$key = str_replace( '-', '_', $key );
+    // change to underscores
+    $key = str_replace( '-', '_', $key );
 
-	$args[ $key ] = $value;
+    $args[ $key ] = $value;
 }
 
 // modify the log output
 class icit_srdb_cli extends icit_srdb {
 
-	public function log( $type = '' ) {
+    public function log( $type = '' ) {
 
-		$args = array_slice( func_get_args(), 1 );
+        $args = array_slice( func_get_args(), 1 );
 
-		$output = "";
+        $output = "";
 
-		switch( $type ) {
-			case 'error':
-				list( $error_type, $error ) = $args;
-				$output .= "$error_type: $error";
-				break;
-			case 'search_replace_table_start':
-				list( $table, $search, $replace ) = $args;
-				$output .= "{$table}: replacing {$search} with {$replace}";
-				break;
-			case 'search_replace_table_end':
-				list( $table, $report ) = $args;
-				$time = number_format( $report[ 'end' ] - $report[ 'start' ], 8 );
-				$output .= "{$table}: {$report['rows']} rows, {$report['change']} changes found, {$report['updates']} updates made in {$time} seconds";
-				break;
-			case 'search_replace_end':
-				list( $search, $replace, $report ) = $args;
-				$time = number_format( $report[ 'end' ] - $report[ 'start' ], 8 );
-				$dry_run_string = $this->dry_run ? "would have been" : "were";
-				$output .= "
+        switch( $type ) {
+            case 'error':
+                list( $error_type, $error ) = $args;
+                $output .= "$error_type: $error";
+                break;
+            case 'search_replace_table_start':
+                list( $table, $search, $replace ) = $args;
+                $output .= "{$table}: replacing {$search} with {$replace}";
+                break;
+            case 'search_replace_table_end':
+                list( $table, $report ) = $args;
+                $time = number_format( $report[ 'end' ] - $report[ 'start' ], 8 );
+                $output .= "{$table}: {$report['rows']} rows, {$report['change']} changes found, {$report['updates']} updates made in {$time} seconds";
+                break;
+            case 'search_replace_end':
+                list( $search, $replace, $report ) = $args;
+                $time = number_format( $report[ 'end' ] - $report[ 'start' ], 8 );
+                $dry_run_string = $this->dry_run ? "would have been" : "were";
+                $output .= "
 Replacing {$search} with {$replace} on {$report['tables']} tables with {$report['rows']} rows
 {$report['change']} changes {$dry_run_string} made
 {$report['updates']} updates were actually made
 It took {$time} seconds";
-				break;
-			case 'update_engine':
-				list( $table, $report, $engine ) = $args;
-				$output .= $table . ( $report[ 'converted' ][ $table ] ? ' has been' : 'has not been' ) . ' converted to ' . $engine;
-				break;
-			case 'update_collation':
-				list( $table, $report, $collation ) = $args;
-				$output .= $table . ( $report[ 'converted' ][ $table ] ? ' has been' : 'has not been' ) . ' converted to ' . $collation;
-				break;
-		}
+                break;
+            case 'update_engine':
+                list( $table, $report, $engine ) = $args;
+                $output .= $table . ( $report[ 'converted' ][ $table ] ? ' has been' : 'has not been' ) . ' converted to ' . $engine;
+                break;
+            case 'update_collation':
+                list( $table, $report, $collation ) = $args;
+                $output .= $table . ( $report[ 'converted' ][ $table ] ? ' has been' : 'has not been' ) . ' converted to ' . $collation;
+                break;
+        }
 
-		if ( $this->verbose )
-			echo $output . "\n";
+        if ( $this->verbose )
+            echo $output . "\n";
 
-	}
+    }
 
 }
 
@@ -227,11 +242,11 @@ $report = new icit_srdb_cli( $args );
 
 // Only print a separating newline if verbose mode is on to separate verbose output from result
 if ($args[ 'verbose' ]) {
-	echo "\n";
+    echo "\n";
 }
 
 if ( $report && ( ( isset( $args[ 'dry_run' ] ) && $args[ 'dry_run' ] ) || empty( $report->errors[ 'results' ] ) ) ) {
-	echo "And we're done!\n";
+    echo "And we're done!\n";
 } else {
-	echo "Check the output for errors. You may need to ensure verbose output is on by using -v or --verbose.\n";
+    echo "Check the output for errors. You may need to ensure verbose output is on by using -v or --verbose.\n";
 }

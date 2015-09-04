@@ -241,6 +241,7 @@ class icit_srdb {
 	 * @param array $tables  tables to run replcements against
 	 * @param bool $live    live run
 	 * @param array $exclude_cols  tables to run replcements against
+	 * @param bool $ini  search for credentials in ~/.my.cnf
 	 *
 	 * @return void
 	 */
@@ -262,7 +263,8 @@ class icit_srdb {
 			'pagesize' 			=> 50000,
 			'alter_engine' 		=> false,
 			'alter_collation' 	=> false,
-			'verbose'			=> false
+			'verbose'			=> false,
+			'ini'				=> false
 		), $args );
 
 		// handle exceptions
