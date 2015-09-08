@@ -67,11 +67,11 @@ Type `php srdb.cli.php` to run the program. Type `php srdb.cli.php --help` for u
 		
 	-u, --user
 	
-		Required. Database user.
+		Required. Database user. Tries to get user from ~/.my.cnf if not passed.
 		
 	-p, --pass
 	
-		Required. Database user's password.
+		Required. Database user's password. Tries to get password from ~/.my.cnf if not passed.
 		
 	--port
 	
