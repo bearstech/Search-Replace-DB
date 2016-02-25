@@ -56,10 +56,6 @@ You can copy Search Replace DB into the following location:
 To invoke the script, nagivate in your shell to the directory to where you installed Search Replace DB.
 
 Type `php srdb.cli.php` to run the program. Type `php srdb.cli.php --help` for usage information:
-
-	-h, --host
-	
-		Required. The hostname of the database server.
 		
 	-n, --name
 	
@@ -67,11 +63,16 @@ Type `php srdb.cli.php` to run the program. Type `php srdb.cli.php --help` for u
 		
 	-u, --user
 	
-		Required. Database user. Tries to get user from ~/.my.cnf if not passed.
+		Optional. Database user. Tries to get user from ~/.my.cnf if not passed.
 		
 	-p, --pass
 	
-		Required. Database user's password. Tries to get password from ~/.my.cnf if not passed.
+		Optional. Database user's password. Tries to get password from ~/.my.cnf if not passed.
+
+	-h, --host
+	
+		Optional. The hostname of the database server.
+		The default is 127.0.0.1.
 		
 	--port
 	

@@ -35,9 +35,6 @@ $opts = array(
 );
 
 $required = array(
-    'h:',
-    'u:',
-    'p:',
     'n:'
 );
 
@@ -75,14 +72,15 @@ Github: https://github.com/interconnectit/search-replace-db
 Argument values are strings unless otherwise specified.
 
 ARGS
-  -h, --host
-    Required. The hostname of the database server.
   -n, --name
     Required. Database name.
   -u, --user
-    Required. Database user. Tries to get user from ~/.my.cnf if not passed.
+    Optional. Database user. Tries to get user from ~/.my.cnf if not passed.
   -p, --pass
-    Required. Database user's password. Tries to get password from ~/.my.cnf if not passed.
+    Optional. Database user's password. Tries to get password from ~/.my.cnf if not passed.
+  -h, --host
+    Optional. The hostname of the database server.
+    The default is 127.0.0.1.
   --port
     Optional. Port on database server to connect to.
     The default is 3306. (MySQL default port).
@@ -130,8 +128,18 @@ $missing_arg = false;
 
 // Get ~/.my.cnf file for user and pass if not submitted
 if ( $mycnf = parse_ini_file(getenv('HOME').'/.my.cnf',true) ) {
-    if ( ! isset( $options[ 'user' ] ) ) $options[ 'user' ] = $mycnf[ 'client' ][ 'user' ];
-    if ( ! isset( $options[ 'pass' ] ) ) $options[ 'pass' ] = $mycnf[ 'client' ][ 'pass' ];
+    if ( ! isset( $options[ 'user' ] ) ) {
+        $options[ 'user' ] = $mycnf[ 'client' ][ 'user' ];
+    }
+    if ( ! isset( $options[ 'pass' ] ) ) {
+        $options[ 'pass' ] = $mycnf[ 'client' ][ 'pass' ];
+    }
+} elseif ( ! ( $mycnf = parse_ini_file(getenv('HOME').'/.my.cnf',true) ) && ! isset( $options[ 'user' ] ) && ! isset( $options[ 'u' ] ) ) {
+    fwrite( STDERR, "Error: Unable to read ".getenv('HOME').'/.my.cnf'." Missing argument, -{u} or --{user} is required.\n" );
+    $missing_arg = true;
+} elseif ( ! ( $mycnf = parse_ini_file(getenv('HOME').'/.my.cnf',true) ) && ! isset( $options[ 'pass' ] ) && ! isset( $options[ 'p' ] ) ) {
+    fwrite( STDERR, "Error: Unable to read ".getenv('HOME').'/.my.cnf'." Missing argument, -{p} or --{pass} is required.\n" );
+    $missing_arg = true;
 }
 
 // check required args are passed
