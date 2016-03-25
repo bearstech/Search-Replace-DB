@@ -113,6 +113,11 @@ class icit_srdb {
 	public $tables = array();
 
 	/**
+	 * @var array Filter on tables to run the replacement on
+	 */
+	public $filter = array();
+
+	/**
 	 * @var string Search term
 	 */
 	public $search = false;
@@ -182,6 +187,7 @@ class icit_srdb {
 						'search' => array(),
 						'db' => array(),
 						'tables' => array(),
+						'filter' => array(),
 						'results' => array()
 					);
 
@@ -239,6 +245,7 @@ class icit_srdb {
 	 * @param string $search  search string / regex
 	 * @param string $replace replacement string
 	 * @param array $tables  tables to run replcements against
+	 * @param array $filter  tables to run replcements against
 	 * @param bool $live    live run
 	 * @param array $exclude_cols  tables to run replcements against
 	 * @param bool $ini  search for credentials in ~/.my.cnf
@@ -256,6 +263,7 @@ class icit_srdb {
 			'search' 			=> '',
 			'replace' 			=> '',
 			'tables'			=> array(),
+			'filter'			=> array(),
 			'exclude_cols' 		=> array(),
 			'include_cols' 		=> array(),
 			'dry_run' 			=> true,
@@ -274,7 +282,7 @@ class icit_srdb {
 		set_error_handler( array( $this, 'errors' ), E_ERROR | E_WARNING );
 
 		// allow a string for columns
-		foreach( array( 'exclude_cols', 'include_cols', 'tables' ) as $maybe_string_arg ) {
+		foreach( array( 'exclude_cols', 'include_cols', 'tables', 'filter' ) as $maybe_string_arg ) {
 			if ( is_string( $args[ $maybe_string_arg ] ) )
 				$args[ $maybe_string_arg ] = array_filter( array_map( 'trim', explode( ',', $args[ $maybe_string_arg ] ) ) );
 		}
@@ -312,6 +320,35 @@ class icit_srdb {
 
 		}
 
+		// set tables filters
+		if ( !empty( $this->filter ) ) {
+			$tmp = array();
+			$resw = '/^(\w+)(\*)$/i';
+			$reew = '/^(\*)(\w+)$/i';
+			$rein = '/^(\*)(\w+)(\*)$/i';
+			foreach ($this->filter as $f) {
+				preg_match($resw, $f, $matches);
+				if ($matches[0]) {
+					$regex = '/^'.$matches[1].'\w+/i';
+					array_push($tmp, $regex);
+					continue;
+				}
+				preg_match($reew, $f, $matches);
+				if ($matches[0]) {
+					$regex = '/\w+'.$matches[2].'$/i';
+					array_push($tmp, $regex);
+					continue;
+				}
+				preg_match($rein, $f, $matches);
+				if ($matches[0]) {
+					$regex = '/\w+'.$matches[2].'\w+/i';
+					array_push($tmp, $regex);
+					continue;
+				}
+			}
+			$this->filter = $tmp;
+		}
+
 		// set up db connection
 		$this->db_setup();
 
@@ -319,17 +356,17 @@ class icit_srdb {
 
 			// update engines
 			if ( $this->alter_engine ) {
-				$report = $this->update_engine( $this->alter_engine, $this->tables );
+				$report = $this->update_engine( $this->alter_engine, $this->tables, $this->filter );
 			}
 
 			// update collation
 			elseif ( $this->alter_collation ) {
-				$report = $this->update_collation( $this->alter_collation, $this->tables );
+				$report = $this->update_collation( $this->alter_collation, $this->tables, $this->filter );
 			}
 
 			// default search/replace action
 			else {
-				$report = $this->replacer( $this->search, $this->replace, $this->tables );
+				$report = $this->replacer( $this->search, $this->replace, $this->tables, $this->filter );
 			}
 
 		} else {
@@ -505,7 +542,7 @@ class icit_srdb {
 	 *
 	 * @return array
 	 */
-	public function get_tables() {
+	public function get_tables( $filter = array( ) ) {
 		// get tables
 
 		// A clone of show table status but with character set for the table.
@@ -552,7 +589,18 @@ class icit_srdb {
 				if ( $table[ 'Comment' ] == 'VIEW' )
 					continue;
 
-				$all_tables[ $table[0] ] = $table;
+				if ( !empty( $filter ) ) {
+					$table_name = $table[0];
+					foreach ($filter as $f) {
+						preg_match($f, $table_name, $matches);
+						if ($matches) {
+							$all_tables[ $table[0] ] = $table;
+							break;
+						}
+					}
+				} else {
+					$all_tables[ $table[0] ] = $table;
+				}
 			}
 
 		}
@@ -802,7 +850,7 @@ class icit_srdb {
 	 *
 	 * @return array    Collection of information gathered during the run.
 	 */
-	public function replacer( $search = '', $replace = '', $tables = array( ) ) {
+	public function replacer( $search = '', $replace = '', $tables = array( ), $filter = array( ) ) {
 
 		// check we have a search string, bail if not
 		if ( empty( $search ) ) {
@@ -835,9 +883,9 @@ class icit_srdb {
 		if ( $this->get( 'dry_run' ) ) 	// Report this as a search-only run.
 			$this->add_error( 'The dry-run option was selected. No replacements will be made.', 'results' );
 
-		// if no tables selected assume all
+		// if no tables selected or filtered assume all
 		if ( empty( $tables ) ) {
-			$all_tables = $this->get_tables();
+			$all_tables = $this->get_tables( $filter );
 			$tables = array_keys( $all_tables );
 		}
 
@@ -1026,7 +1074,7 @@ class icit_srdb {
 	 *
 	 * @return array    Modification report
 	 */
-	public function update_engine( $engine = 'MyISAM', $tables = array() ) {
+	public function update_engine( $engine = 'MyISAM', $tables = array(), $filter = array( )  ) {
 
 		$report = false;
 
@@ -1038,7 +1086,7 @@ class icit_srdb {
 			$report = array( 'engine' => $engine, 'converted' => array() );
 
 			if ( empty( $tables ) ) {
-				$all_tables = $this->get_tables();
+				$all_tables = $this->get_tables( $filter );
 				$tables = array_keys( $all_tables );
 			}
 
@@ -1079,7 +1127,7 @@ class icit_srdb {
 	 *
 	 * @return array    Modification report
 	 */
-	public function update_collation( $collation = 'utf8_unicode_ci', $tables = array() ) {
+	public function update_collation( $collation = 'utf8_unicode_ci', $tables = array(), $filter = array( )  ) {
 
 		$report = false;
 
@@ -1088,7 +1136,7 @@ class icit_srdb {
 			$report = array( 'collation' => $collation, 'converted' => array() );
 
 			if ( empty( $tables ) ) {
-				$all_tables = $this->get_tables();
+				$all_tables = $this->get_tables( $filter );
 				$tables = array_keys( $all_tables );
 			}
 

@@ -22,6 +22,7 @@ $opts = array(
     's:' => 'search:',
     'r:' => 'replace:',
     't:' => 'tables:',
+    'f:' => 'filter:',
     'i:' => 'include-cols:',
     'x:' => 'exclude-cols:',
     'g' => 'regex',
@@ -93,6 +94,8 @@ ARGS
   -t, --tables
     If set only runs the script on the specified table, comma
     separate for multiple values.
+  -f, --filter
+    If set runs on tables matching pattern.
   -i, --include-cols
     If set only runs the script on the specified columns, comma
     separate for multiple values.
@@ -197,6 +200,10 @@ class icit_srdb_cli extends icit_srdb {
         $output = "";
 
         switch( $type ) {
+            case 'debug':
+                list( $debug_type, $debug ) = $args;
+                $output .= "$debug_type: $debug";
+                break;
             case 'error':
                 list( $error_type, $error ) = $args;
                 $output .= "$error_type: $error";
