@@ -93,6 +93,11 @@ Type `php srdb.cli.php` to run the program. Type `php srdb.cli.php --help` for u
 	
 		If set only runs the script on the specified table, comma
 		separate for multiple values.
+
+	-f, --filter
+	
+		If set only runs the script on tables matching the pattern, comma
+		separate for multiple values.
 		
 	-i, --include-cols
 	
